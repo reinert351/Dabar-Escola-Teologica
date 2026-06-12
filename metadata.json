@@ -1,0 +1,6 @@
+{
+  "name": "Dabar Escola Teológica",
+  "description": "Sistema Acadêmico completo para gestão escolar, controle de presença, lançamento de notas, fluxo de caixa e portal interativo da Dabar Escola Teológica.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
