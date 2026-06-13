@@ -787,6 +787,7 @@ export default function App() {
                 <DashboardView 
                   students={students} 
                   subjects={subjects} 
+                  classes={classes}
                   payments={payments}
                   grades={grades}
                   lessonPlans={lessonPlans}
