@@ -1,4 +1,5 @@
 import { Student, Subject, ClassGroup, GradeRecord, AttendanceRecord, PaymentRecord, CashTransaction, AcademicActivity } from './types';
+import initialState from './initialState.json';
 
 export const INITIAL_ACTIVITIES: AcademicActivity[] = [
   { id: 'act-1', title: 'Avaliação Parcial - Teologia Sistemática', description: 'Prova abrangendo os capítulos 1 a 4 sobre a doutrina da revelação.', date: '2026-06-25', type: 'Prova', targetClass: 'Turma Alpha (Teologia)' },
@@ -479,8 +480,11 @@ export const INITIAL_LOGIN_LOGS: any[] = [];
 export const loadData = <T>(key: string, initial: T): T => {
   const item = localStorage.getItem(key);
   if (!item) {
-    localStorage.setItem(key, JSON.stringify(initial));
-    return initial;
+    // If empty in localStorage, check if we have pre-saved database records from initialState.json
+    const savedInWorkspace = (initialState as any)[key];
+    const fallbackValue = savedInWorkspace !== undefined && savedInWorkspace !== null ? savedInWorkspace : initial;
+    localStorage.setItem(key, JSON.stringify(fallbackValue));
+    return fallbackValue;
   }
   try {
     return JSON.parse(item);

@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -10,7 +11,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // API Route: Generate AI study material content for a subject
   app.post("/api/gemini/generate-content", async (req, res) => {
@@ -97,6 +99,48 @@ Não acrescente introduções desnecessárias fora do solicitado, vá direto par
       return res.status(500).json({ 
         error: errorMsg
       });
+    }
+  });
+
+  // API Route: Save current database state to the src/initialState.json source file
+  app.post("/api/save-workspace-data", async (req, res) => {
+    try {
+      const data = req.body;
+      if (!data || typeof data !== "object") {
+        return res.status(400).json({ error: "Dados inválidos enviados no corpo da requisição." });
+      }
+
+      // Check key limits
+      const keys = [
+        'LOGOS_STUDENTS',
+        'LOGOS_SUBJECTS',
+        'LOGOS_CLASSES',
+        'LOGOS_GRADES',
+        'LOGOS_ATTENDANCE',
+        'LOGOS_PAYMENTS',
+        'LOGOS_TRANSACTIONS',
+        'LOGOS_ACTIVITIES',
+        'LOGOS_LESSON_PLANS',
+        'LOGOS_LOGGED_IN_DOCENTE',
+        'LOGOS_LOGIN_LOGS'
+      ];
+
+      // Build a clean state structure containing only values present in request
+      const cleanState: Record<string, any> = {};
+      keys.forEach(key => {
+        if (data[key] !== undefined) {
+          cleanState[key] = data[key];
+        }
+      });
+
+      const writePath = path.resolve("src/initialState.json");
+      fs.writeFileSync(writePath, JSON.stringify(cleanState, null, 2), "utf-8");
+
+      console.log("Database written successfully to source:", writePath);
+      return res.json({ success: true, message: "Prontinho! Os dados foram gravados diretamente no arquivo de estado inicial ('src/initialState.json') do projeto com êxito! Ao publicar no GitHub, esse dataset modificado será o banco de dados inicial por padrão para todos os alunos." });
+    } catch (e: any) {
+      console.error("Erro ao gravar dados no workspace:", e);
+      return res.status(500).json({ error: "Erro ao gravar arquivo no disco do servidor: " + (e?.message || e) });
     }
   });
 

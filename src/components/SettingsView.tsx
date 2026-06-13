@@ -12,6 +12,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState<string>('');
+  const [saveWorkspaceStatus, setSaveWorkspaceStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [saveWorkspaceMsg, setSaveWorkspaceMsg] = useState<string>('');
 
   const generateBackupData = () => {
     // Collect all data from localStorage that we care about
@@ -26,7 +28,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
       'LOGOS_TRANSACTIONS',
       'LOGOS_ACTIVITIES',
       'LOGOS_LESSON_PLANS',
-      'LOGOS_LOGGED_IN_DOCENTE'
+      'LOGOS_LOGGED_IN_DOCENTE',
+      'LOGOS_LOGIN_LOGS'
     ];
     
     keys.forEach(key => {
@@ -56,6 +59,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveToWorkspace = async () => {
+    setSaveWorkspaceStatus('saving');
+    setSaveWorkspaceMsg('');
+    try {
+      const data = generateBackupData();
+      const response = await fetch("/api/save-workspace-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        setSaveWorkspaceStatus('success');
+        setSaveWorkspaceMsg(resData.message || "Gravado com sucesso!");
+        // Auto-dismiss message after 10s
+        setTimeout(() => {
+          setSaveWorkspaceStatus('idle');
+          setSaveWorkspaceMsg('');
+        }, 10000);
+      } else {
+        setSaveWorkspaceStatus('error');
+        setSaveWorkspaceMsg(resData.error || "Erro ao tentar gravar os dados no servidor.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao sincronizar com o projeto:", err);
+      setSaveWorkspaceStatus('error');
+      setSaveWorkspaceMsg("Não foi possível conectar ao servidor de desenvolvimento para gravar as alterações.");
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +150,71 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
           </div>
         </div>
       )}
+
+      {/* Sincronização definitiva de dados para GitHub / Código-Fonte */}
+      <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-md border border-slate-805 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden">
+        <div className="absolute inset-x-0 -top-40 h-80 bg-gradient-to-b from-indigo-500/10 to-transparent blur-3xl pointer-events-none"></div>
+        
+        {/* Info Content Left */}
+        <div className="flex-1 space-y-4 relative z-10 w-full">
+          <div className="w-12 h-12 bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center">
+            <Database className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <span className="bg-amber-400/20 text-amber-300 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded inline-block mb-2 border border-amber-400/10">
+              Urgente: Configuração para o GitHub
+            </span>
+            <h3 className="text-lg font-bold text-slate-100 tracking-tight">Salvar Alunos e Turmas para o GitHub</h3>
+            <p className="text-xs text-slate-350 leading-relaxed mt-2.5">
+              Por padrão, os alunos e as notas que você cadastra ou modifica aqui no painel ficam salvos <strong>somente no navegador local</strong> (<code className="bg-slate-800/80 text-amber-200 px-1 py-0.5 rounded font-mono text-[10px]">localStorage</code>).
+            </p>
+            <p className="text-xs text-slate-350 leading-relaxed mt-2">
+              Se você exportar o app para o <strong>GitHub</strong> ou acessá-lo de outro dispositivo, esses novos cadastros não estarão lá, pois o cache estará limpo. Para resolver isso e <strong>gravar de forma oficial e permanente</strong> esses dados no código-fonte, clique no botão abaixo.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button 
+              type="button"
+              disabled={saveWorkspaceStatus === 'saving'}
+              onClick={handleSaveToWorkspace}
+              className={`px-5 py-3 font-bold text-xs rounded-xl transition duration-300 ${
+                saveWorkspaceStatus === 'saving'
+                  ? 'bg-indigo-700/50 text-indigo-300 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white cursor-pointer shadow-lg shadow-indigo-605/30'
+              } flex items-center gap-2`}
+            >
+              <Database className="w-4 h-4 text-indigo-200" />
+              {saveWorkspaceStatus === 'saving' ? 'Gravando dados no código-fonte...' : 'Gravar Alterações Definitivamente no Código'}
+            </button>
+          </div>
+          
+          {saveWorkspaceStatus === 'success' && (
+            <div className="bg-emerald-950/80 border border-emerald-500/30 text-emerald-100 p-4 rounded-xl text-xs space-y-1.5 animate-fade-in">
+              <span className="font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <CheckCircle className="w-4 h-4 shrink-0" /> Gravado com sucesso total!
+              </span>
+              <p className="leading-relaxed text-slate-300">
+                {saveWorkspaceMsg}
+              </p>
+              <p className="text-[10px] text-emerald-300 leading-normal pt-1.5 bg-emerald-950/20 px-2.5 py-1.5 rounded-lg border border-emerald-500/10 mt-1">
+                <strong>Próximo Passo no Github:</strong> Já está no código-fonte! Agora você pode exportar seu repositório para o GitHub na barra ou menu de configurações do AI Studio normal. Todo novo acesso receberá o seu banco de dados atualizado por padrão!
+              </p>
+            </div>
+          )}
+
+          {saveWorkspaceStatus === 'error' && (
+            <div className="bg-rose-950/80 border border-rose-500/30 text-rose-100 p-4 rounded-xl text-xs space-y-1 animate-fade-in">
+              <span className="font-extrabold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> Falha ao Sincronizar
+              </span>
+              <p className="leading-relaxed text-slate-300">
+                {saveWorkspaceMsg}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Backup Section */}
       <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden">
