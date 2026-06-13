@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Database, Download, Upload, AlertTriangle, ShieldCheck, CheckCircle, Activity, Clock, User } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, ShieldCheck, CheckCircle, Activity, Clock, User, RotateCcw } from 'lucide-react';
 import { loadData, saveData } from '../mockData'; 
 import { AuditLog } from '../types';
 
@@ -14,6 +14,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
   const [restoreStatus, setRestoreStatus] = useState<string>('');
   const [saveWorkspaceStatus, setSaveWorkspaceStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveWorkspaceMsg, setSaveWorkspaceMsg] = useState<string>('');
+
+  const handleResetToProjectDefaults = () => {
+    if (window.confirm("Atenção: Isso irá redefinir o seu navegador local para carregar os dados oficiais salvos no código-fonte do projeto (initialState.json). Suas alterações locais não gravadas serão descartadas. Deseja continuar?")) {
+      const keysToClear = [
+        'LOGOS_STUDENTS',
+        'LOGOS_SUBJECTS',
+        'LOGOS_CLASSES',
+        'LOGOS_GRADES',
+        'LOGOS_ATTENDANCE',
+        'LOGOS_PAYMENTS',
+        'LOGOS_TRANSACTIONS',
+        'LOGOS_ACTIVITIES',
+        'LOGOS_LESSON_PLANS',
+        'LOGOS_LOGGED_IN_DOCENTE',
+        'LOGOS_LOGIN_LOGS',
+        'LOGOS_AUDIT',
+        'LOGOS_CLEAN_SLATE_RESET_V2'
+      ];
+      keysToClear.forEach(key => localStorage.removeItem(key));
+      window.location.reload();
+    }
+  };
 
   const generateBackupData = () => {
     // Collect all data from localStorage that we care about
@@ -186,6 +208,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
             >
               <Database className="w-4 h-4 text-indigo-200" />
               {saveWorkspaceStatus === 'saving' ? 'Gravando dados no código-fonte...' : 'Gravar Alterações Definitivamente no Código'}
+            </button>
+            <button 
+              type="button"
+              onClick={handleResetToProjectDefaults}
+              className="px-5 py-3 font-bold text-xs rounded-xl transition duration-300 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 cursor-pointer shadow-lg border border-slate-700 flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-400" />
+              Carregar do Código (Resetar Navegador)
             </button>
           </div>
           

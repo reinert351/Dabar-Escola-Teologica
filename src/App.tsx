@@ -69,10 +69,9 @@ export default function App() {
   
   const [subjects, setSubjects] = useState<Subject[]>(() => {
     const loaded = loadData<Subject[]>('LOGOS_SUBJECTS', INITIAL_SUBJECTS);
-    const baseSubjects = (!loaded || loaded.length < 10) ? INITIAL_SUBJECTS : loaded;
     
     // Force all subjects to have 'Pb. Marcelo Reinert' as teacher
-    const forcedSubjects = baseSubjects.map(sub => ({
+    const forcedSubjects = loaded.map(sub => ({
       ...sub,
       teacherName: 'Pb. Marcelo Reinert'
     }));
@@ -82,21 +81,11 @@ export default function App() {
   });
   
   const [classes, setClasses] = useState<ClassGroup[]>(() => {
-    const loaded = loadData<ClassGroup[]>('LOGOS_CLASSES', INITIAL_CLASSES);
-    if (!loaded || loaded.length === 0 || (loaded[0] && loaded[0].subjectIds.length < 10)) {
-      saveData('LOGOS_CLASSES', INITIAL_CLASSES);
-      return INITIAL_CLASSES;
-    }
-    return loaded;
+    return loadData<ClassGroup[]>('LOGOS_CLASSES', INITIAL_CLASSES);
   });
   
   const [grades, setGrades] = useState<GradeRecord[]>(() => {
-    const loaded = loadData<GradeRecord[]>('LOGOS_GRADES', INITIAL_GRADES);
-    if (!loaded || loaded.length < 50) {
-      saveData('LOGOS_GRADES', INITIAL_GRADES);
-      return INITIAL_GRADES;
-    }
-    return loaded;
+    return loadData<GradeRecord[]>('LOGOS_GRADES', INITIAL_GRADES);
   });
   
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => 
@@ -293,26 +282,7 @@ export default function App() {
     saveData('LOGOS_LOGIN_LOGS', loginLogs);
   }, [loginLogs]);
 
-  // Auto-reset once to a complete clean slate (zero pre-loaded students)
-  useEffect(() => {
-    const isFirstTimeCleanRun = localStorage.getItem('LOGOS_CLEAN_SLATE_RESET_V2') !== 'true';
-    if (isFirstTimeCleanRun) {
-      localStorage.setItem('LOGOS_STUDENTS', JSON.stringify([]));
-      localStorage.setItem('LOGOS_GRADES', JSON.stringify([]));
-      localStorage.setItem('LOGOS_ATTENDANCE', JSON.stringify([]));
-      localStorage.setItem('LOGOS_PAYMENTS', JSON.stringify([]));
-      localStorage.setItem('LOGOS_TRANSACTIONS', JSON.stringify([]));
-      localStorage.setItem('LOGOS_LOGIN_LOGS', JSON.stringify([]));
-      localStorage.setItem('LOGOS_CLEAN_SLATE_RESET_V2', 'true');
-      
-      setStudents([]);
-      setGrades([]);
-      setAttendance([]);
-      setPayments([]);
-      setTransactions([]);
-      setLoginLogs([]);
-    }
-  }, []);
+
 
   // Migration effect to update old 'Mensalidade' data to 'Venda de Livros' or 'Ofertas nas aulas' and update 120.00 to 60.00
   useEffect(() => {
