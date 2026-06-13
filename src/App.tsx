@@ -293,39 +293,26 @@ export default function App() {
     saveData('LOGOS_LOGIN_LOGS', loginLogs);
   }, [loginLogs]);
 
-  // Migration effect to ensure Adriana de Paula and her exact grades are present in active state
+  // Auto-reset once to a complete clean slate (zero pre-loaded students)
   useEffect(() => {
-    const hasAdriana = students.some(s => s.id === 'std-adriana');
-    if (!hasAdriana) {
-      const adrianaMock = INITIAL_STUDENTS.find(s => s.id === 'std-adriana');
-      if (adrianaMock) {
-        setStudents(prev => {
-          if (!prev.some(s => s.id === 'std-adriana')) {
-            return [...prev, adrianaMock];
-          }
-          return prev;
-        });
-        
-        const adrianaGrades = INITIAL_GRADES.filter(g => g.studentId === 'std-adriana');
-        setGrades(prev => {
-          const removedAdriana = prev.filter(g => g.studentId !== 'std-adriana');
-          return [...removedAdriana, ...adrianaGrades];
-        });
-      }
-    } else {
-      // Force refresh her grades if she exists but doesn't have her custom high-fidelity grades loaded
-      const adrianaMockGrades = INITIAL_GRADES.filter(g => g.studentId === 'std-adriana');
-      setGrades(prev => {
-        const hasAnyGrades = prev.some(g => g.studentId === 'std-adriana');
-        const hasCorrectGrades = prev.some(g => g.studentId === 'std-adriana' && g.averageGrade === 9.8);
-        if (!hasAnyGrades || !hasCorrectGrades) {
-          const removedAdriana = prev.filter(g => g.studentId !== 'std-adriana');
-          return [...removedAdriana, ...adrianaMockGrades];
-        }
-        return prev;
-      });
+    const isFirstTimeCleanRun = localStorage.getItem('LOGOS_CLEAN_SLATE_RESET_V2') !== 'true';
+    if (isFirstTimeCleanRun) {
+      localStorage.setItem('LOGOS_STUDENTS', JSON.stringify([]));
+      localStorage.setItem('LOGOS_GRADES', JSON.stringify([]));
+      localStorage.setItem('LOGOS_ATTENDANCE', JSON.stringify([]));
+      localStorage.setItem('LOGOS_PAYMENTS', JSON.stringify([]));
+      localStorage.setItem('LOGOS_TRANSACTIONS', JSON.stringify([]));
+      localStorage.setItem('LOGOS_LOGIN_LOGS', JSON.stringify([]));
+      localStorage.setItem('LOGOS_CLEAN_SLATE_RESET_V2', 'true');
+      
+      setStudents([]);
+      setGrades([]);
+      setAttendance([]);
+      setPayments([]);
+      setTransactions([]);
+      setLoginLogs([]);
     }
-  }, [students]);
+  }, []);
 
   // Migration effect to update old 'Mensalidade' data to 'Venda de Livros' or 'Ofertas nas aulas' and update 120.00 to 60.00
   useEffect(() => {
