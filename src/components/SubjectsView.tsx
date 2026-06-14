@@ -109,6 +109,8 @@ export default function SubjectsView({
   const [aiError, setAiError] = useState('');
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [customClassNotes, setCustomClassNotes] = useState('');
+  const [inlineKey, setInlineKey] = useState(() => localStorage.getItem('LOGOS_C_GEMINI_KEY') || '');
+  const [showInlineKeyInput, setShowInlineKeyInput] = useState(false);
 
   const loadLessonContent = (sub: Subject, clsNum: 'ementa' | number) => {
     if (clsNum === 'ementa') {
@@ -125,6 +127,9 @@ export default function SubjectsView({
     setCustomClassNotes('');
     setAiError('');
     setIsEditingMode(false);
+    const savedKey = localStorage.getItem('LOGOS_C_GEMINI_KEY') || '';
+    setInlineKey(savedKey);
+    setShowInlineKeyInput(window.location.hostname.includes('github.io') && !savedKey);
   };
 
   const handleSwitchClassNumber = (num: 'ementa' | number) => {
@@ -154,57 +159,159 @@ export default function SubjectsView({
     setAiError('');
   };
 
+  const handleSaveInlineKey = (keyVal: string) => {
+    if (keyVal.trim()) {
+      localStorage.setItem('LOGOS_C_GEMINI_KEY', keyVal.trim());
+      setInlineKey(keyVal.trim());
+      setShowInlineKeyInput(false);
+      setAiError('');
+      // Auto trigger try again!
+      setTimeout(() => {
+        handleGenerateAiContent();
+      }, 100);
+    }
+  };
+
   const handleGenerateAiContent = async () => {
     if (!aiModalSubject) return;
     setIsGenerating(true);
     setAiError('');
+    
+    const savedKey = localStorage.getItem('LOGOS_C_GEMINI_KEY') || '';
+    const isGitHubPages = window.location.hostname.includes('github.io');
+    
+    const isEmenta = selectedClassNumber === 'ementa';
+    let notesSection = "";
+    if (customClassNotes && customClassNotes.trim()) {
+      notesSection = `O professor forneceu as seguintes notas ou direcionamentos para a ${isEmenta ? "MATRIZ / EMENTA GERAL" : `AULA ${selectedClassNumber}`} para servir de base direta:
+"""
+${customClassNotes.trim()}
+"""
+Você DEVE basear e estruturar o conteúdo focando na ${isEmenta ? "Matriz / Ementa Geral" : `aula ${selectedClassNumber}`}, expandindo os conceitos teológicos fornecidos.`;
+    }
+
+    const classContext = isEmenta
+      ? `Você está gerando a MATRIZ / EMENTA GERAL de Ensino para a disciplina. Foco em introduzir o plano de ensino geral, objetivos teológicos macros, cronograma resumido de debates e referências basilares.`
+      : selectedClassNumber 
+        ? `Você está gerando o estudo ESPECÍFICO para a AULA ${selectedClassNumber} (de um total de 4 aulas). Foco no conteúdo exclusivo deste encontro.`
+        : `Você está gerando um ótimo material de subsídio acadêmico e de estudo geral para a disciplina.`;
+
+    const prompt = `Você é um renomado professor e teólogo da "Dabar Escola Teológica". 
+Você está gerando um ótimo material de subsídio acadêmico e de estudo para os alunos.
+Gere um conteúdo de estudo completo prático e inspirador para a disciplina de "${aiModalSubject.name}", que é lecionada pelo professor "${aiModalSubject.teacherName || 'Docente Responsável'}" com carga horária de ${aiModalSubject.workload || 60} horas.
+
+${classContext}
+
+${notesSection}
+
+Gere o conteúdo em português utilizando formatação Markdown bonita, organizada e limpa (incluindo quebras de linha adequadas, títulos com # ou ##, tópicos e formatações em negrito).
+
+Inclua as seguintes seções estruturadas:
+${isEmenta 
+  ? `1. **Apresentação e Ementa Geral** (Visão global e cronograma macro da disciplina)
+2. **Importância Teológica** (Por que esta disciplina é vital para o ministério e para a fé cristã)
+3. **Objetivos Gerais de Aprendizado** (O que se espera que o estudante desenvolva intelectual e ministerialmente)
+4. **Referências Bibliográficas Principais** (Obras bíblicas, históricas ou acadêmicas recomendadas)`
+  : `1. **Objetivo da Aula ${selectedClassNumber || ''}** (Visão geral e metas deste estudo específico)
+2. **Desenvolvimento do Tema** (Explique os tópicos de forma profunda, integrando as notas do professor de maneira didática)
+3. **Referências de Apoio** (Seções bíblicas ou referências recomendadas para esta aula)
+4. **Reflexão Prática** (Um pensamento enriquecedor focado no assunto para edificar o aluno e instigá-lo a refletir de forma teológica profunda)`}
+
+Não acrescente introduções desnecessárias fora do solicitado, vá direto para o conteúdo formatado.`;
+
     try {
-      const baseUrl = import.meta.env.BASE_URL || "/";
-      const fetchUrl = `${baseUrl}/api/gemini/generate-content`.replace(/\/+/g, '/');
-      const response = await fetch(fetchUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subjectName: aiModalSubject.name,
-          teacherName: aiModalSubject.teacherName,
-          workload: aiModalSubject.workload,
-          classNotes: customClassNotes,
-          classNumber: selectedClassNumber,
-        }),
-      });
-
-      if (!response.ok) {
-        let errMsg = "Houve uma falha ao gerar o conteúdo.";
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          errMsg = errorData.error || errMsg;
-        } else {
-          const text = await response.text();
-          const titleMatch = text.match(/<title>(.*?)<\/title>/i);
-          if (titleMatch && titleMatch[1]) {
-            errMsg = `Erro de Servidor (${response.status}): ${titleMatch[1]}`;
-          } else {
-            errMsg = `Erro de Rede/Servidor (${response.status}): O servidor não retornou JSON válido.`;
-          }
-          console.error("Detalhes do erro em HTML/Texto:", text);
+      let generatedContent = "";
+      
+      // If a client key is configured, use it directly to perform a direct API call
+      if (savedKey) {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${savedKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: prompt }]
+            }]
+          })
+        });
+        
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          const apiMsg = data?.error?.message || `Código de status ${response.status}`;
+          throw new Error(`Erro na API do Gemini (Client-Side): ${apiMsg}`);
         }
-        throw new Error(errMsg);
+        
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) {
+          throw new Error("A API do Gemini retornou uma resposta sem conteúdo textual.");
+        }
+        generatedContent = text;
+      } else {
+        // No client key, try backend
+        if (isGitHubPages) {
+          setShowInlineKeyInput(true);
+          throw new Error("Você está no GitHub Pages! Como essa hospedagem é estática, o backend de processamento de IA não roda aqui. Por favor, insira sua chave de API do Gemini própria na barra de erro abaixo:");
+        }
+        
+        const baseUrl = import.meta.env.BASE_URL || "/";
+        const fetchUrl = `${baseUrl}/api/gemini/generate-content`.replace(/\/+/g, '/');
+        const response = await fetch(fetchUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subjectName: aiModalSubject.name,
+            teacherName: aiModalSubject.teacherName,
+            workload: aiModalSubject.workload,
+            classNotes: customClassNotes,
+            classNumber: selectedClassNumber,
+          }),
+        });
+
+        if (!response.ok) {
+          let errMsg = "Houve uma falha ao gerar o conteúdo.";
+          
+          if (response.status === 405) {
+            setShowInlineKeyInput(true);
+            errMsg = "O servidor retornou Erro 405 (Método Não Permitido). Isso indica que você está em uma hospedagem estática como o GitHub Pages. Para rodar a IA direto pelo seu navegador de forma ilimitada, configure sua chave do Gemini abaixo:";
+          } else {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const errorData = await response.json();
+              errMsg = errorData.error || errMsg;
+            } else {
+              const text = await response.text();
+              const titleMatch = text.match(/<title>(.*?)<\/title>/i);
+              if (titleMatch && titleMatch[1]) {
+                errMsg = `Erro de Servidor (${response.status}): ${titleMatch[1]}`;
+              } else {
+                errMsg = `Erro de Rede/Servidor (${response.status}): O servidor não retornou JSON válido.`;
+              }
+              // Fallback to key input for typical static hosts showing HTML index files
+              if (text.includes("<!DOCTYPE html>") || response.status === 404) {
+                setShowInlineKeyInput(true);
+                errMsg = `Ambiente de hospedagem estático detectado (Status ${response.status}). Insira sua chave de API do Gemini abaixo para rodar as consultas direto do navegador:`;
+              }
+            }
+          }
+          throw new Error(errMsg);
+        }
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          setShowInlineKeyInput(true);
+          throw new Error(`O servidor não retornou JSON válido. Insira sua chave de API própria abaixo para usar modo direto do navegador:`);
+        }
+
+        const data = await response.json();
+        generatedContent = data.content;
       }
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Resposta recebida que não é JSON:", text);
-        throw new Error(`O servidor não retornou um JSON válido (Status: ${response.status}).`);
-      }
-
-      const data = await response.json();
-      setAiContentText(data.content);
+      setAiContentText(generatedContent);
       
       // Auto-save generated content immediately
       if (selectedClassNumber === 'ementa') {
-        const updatedSub = { ...aiModalSubject, aiContent: data.content.trim() };
+        const updatedSub = { ...aiModalSubject, aiContent: generatedContent.trim() };
         onEditSubject(updatedSub);
         setAiModalSubject(updatedSub);
       } else {
@@ -212,7 +319,7 @@ export default function SubjectsView({
           id: `lesson-${aiModalSubject.id}-${selectedClassNumber}`,
           subjectId: aiModalSubject.id,
           classNumber: selectedClassNumber as number,
-          content: data.content.trim()
+          content: generatedContent.trim()
         });
       }
     } catch (err: any) {
@@ -627,13 +734,49 @@ export default function SubjectsView({
               </div>
             )}
 
-            {/* Error banner */}
-            {aiError && (
-              <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs rounded-xl flex items-start gap-2 mb-3 shrink-0">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="font-semibold">{aiError}</span>
-              </div>
-            )}
+             {/* Error banner */}
+             {aiError && (
+               <div className="space-y-2 mb-3 shrink-0">
+                 <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs rounded-xl flex items-start gap-2">
+                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                   <span className="font-semibold">{aiError}</span>
+                 </div>
+                 
+                 {showInlineKeyInput && (
+                   <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-2.5 animate-fade-in text-xs text-indigo-900">
+                     <p className="font-bold flex items-center gap-1.5 leading-normal">
+                       <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                       Configure sua Chave de API própria (Segura e Local)
+                     </p>
+                     <p className="text-[10px] text-indigo-700/95 leading-relaxed font-medium">
+                       Insira sua Chave do Gemini do Google AI Studio para que o navegador se conecte diretamente e de forma ilimitada, sem depender de servidor externo:
+                     </p>
+                     <div className="flex gap-2">
+                       <input
+                         type="password"
+                         placeholder="AIzaSy..."
+                         value={inlineKey}
+                         onChange={(e) => setInlineKey(e.target.value)}
+                         className="flex-1 text-xs px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono outline-none shadow-xs text-slate-800"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => handleSaveInlineKey(inlineKey)}
+                         className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shrink-0 shadow-sm cursor-pointer"
+                       >
+                         Salvar e Gerar
+                       </button>
+                     </div>
+                     <p className="text-[9px] text-indigo-505/80 leading-normal">
+                       * Ficará gravada apenas no seu dispositivo (LocalStorage). Adquira gratuitamente em{' '}
+                       <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="underline font-bold hover:text-indigo-700">
+                         aistudio.google.com
+                       </a>.
+                     </p>
+                   </div>
+                 )}
+               </div>
+             )}
 
             {/* Main Area: Scrollable Content, Textarea or Loading */}
             <div className="flex-1 overflow-y-auto mb-4 border border-slate-100 rounded-xl p-4 bg-slate-50/50 min-h-[150px] md:min-h-[250px]">

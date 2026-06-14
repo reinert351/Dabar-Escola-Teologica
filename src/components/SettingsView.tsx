@@ -15,6 +15,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
   const [saveWorkspaceStatus, setSaveWorkspaceStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveWorkspaceMsg, setSaveWorkspaceMsg] = useState<string>('');
 
+  const [clientGeminiKey, setClientGeminiKey] = useState(() => localStorage.getItem('LOGOS_C_GEMINI_KEY') || '');
+  const [isKeySaved, setIsKeySaved] = useState(false);
+
+  const handleSaveClientGeminiKey = () => {
+    if (clientGeminiKey.trim()) {
+      localStorage.setItem('LOGOS_C_GEMINI_KEY', clientGeminiKey.trim());
+      setIsKeySaved(true);
+      setTimeout(() => setIsKeySaved(false), 3000);
+    } else {
+      localStorage.removeItem('LOGOS_C_GEMINI_KEY');
+      setIsKeySaved(true);
+      setTimeout(() => setIsKeySaved(false), 3000);
+    }
+  };
+
 
 
   const generateBackupData = () => {
@@ -296,7 +311,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
               accept=".json,application/json" 
               onChange={handleFileUpload}
             />
-            <div className="flexflex-col items-center justify-center text-slate-400 py-2">
+            <div className="flex flex-col items-center justify-center text-slate-400 py-2">
                <Upload className="w-5 h-5 mx-auto mb-2 text-slate-400" />
                <span className="text-xs font-bold font-sans">Selecionar arquivo JSON</span>
             </div>
@@ -304,6 +319,90 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
 
         </div>
 
+      </div>
+
+      {/* Gemini Integration Section */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 space-y-4">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0">
+            <Activity className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-800 tracking-tight">Inteligência Artificial (Planejador de Ementas)</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              O Planejador Teológico Virtual gera ementas e planos de aula estruturados automaticamente. 
+              Como você está no <strong>caso de deploy offline/estático (GitHub Pages)</strong>, o servidor de backend Node.js não roda nativamente. Para que os docentes usem a IA de forma ilimitada, configure uma chave de API do Gemini individual para o navegador.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          <div className="md:col-span-2 space-y-3">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Chave de API do Gemini (Browser LocalStorage)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="Insira sua GEMINI_API_KEY do Google AI Studio..."
+                value={clientGeminiKey}
+                onChange={(e) => setClientGeminiKey(e.target.value)}
+                className="flex-1 text-xs px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-slate-400 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleSaveClientGeminiKey}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition duration-200 cursor-pointer"
+              >
+                Salvar Chave
+              </button>
+            </div>
+            
+            {isKeySaved && (
+              <p className="text-[10px] text-emerald-605 font-bold flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5" /> Chave de API atualizada com sucesso!
+              </p>
+            )}
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              * A chave será armazenada de forma segura <strong>apenas no navegador local</strong> do usuário pela chave <code className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-mono text-[9px]">LOGOS_C_GEMINI_KEY</code>. Obtenha uma chave gratuita e ilimitada do Gemini no portal para desenvolvedores do Google{' '}
+              <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-bold inline-flex items-center gap-0.5">
+                Google AI Studio
+              </a>.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col justify-between space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-slate-750 uppercase tracking-wider">Status da Conexão de IA</h4>
+              <p className="text-[10px] text-slate-500 mt-1">Status operacional da inteligência artificial hermenêutica no dispositivo:</p>
+            </div>
+
+            <div className="space-y-2">
+              {window.location.hostname.includes('github.io') ? (
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-orange-50 border border-orange-100 text-orange-700">
+                  <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></div>
+                  <div className="text-[10px] space-y-0.5">
+                    <p className="font-bold">Hospedagem Estática (GitHub Pages)</p>
+                    <p className="text-[9px] text-orange-600">Requer Chave de API própria inserida.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <div className="text-[10px] space-y-0.5">
+                    <p className="font-bold">Servidor Local Conectado</p>
+                    <p className="text-[9px] text-emerald-600">Pode usar a chave do servidor ou sua chave local.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 font-medium">
+                Modo Ativo: <strong className="text-indigo-650">{localStorage.getItem('LOGOS_C_GEMINI_KEY') ? 'Chave de API Direta' : 'Servidor Integrado'}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Audit Logs Section */}
