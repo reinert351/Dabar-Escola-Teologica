@@ -68,7 +68,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
     setSaveWorkspaceMsg('');
     try {
       const data = generateBackupData();
-      const response = await fetch("/api/save-workspace-data", {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const fetchUrl = `${baseUrl}/api/save-workspace-data`.replace(/\/+/g, '/');
+      const response = await fetch(fetchUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

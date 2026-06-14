@@ -15,7 +15,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // API Route: Generate AI study material content for a subject
-  app.post("/api/gemini/generate-content", async (req, res) => {
+  app.post(["/api/gemini/generate-content", "/Dabar-Escola-Teologica/api/gemini/generate-content"], async (req, res) => {
     try {
       const { subjectName, teacherName, workload, classNotes, classNumber } = req.body;
 
@@ -103,7 +103,7 @@ Não acrescente introduções desnecessárias fora do solicitado, vá direto par
   });
 
   // API Route: Save current database state to the src/initialState.json source file
-  app.post("/api/save-workspace-data", async (req, res) => {
+  app.post(["/api/save-workspace-data", "/Dabar-Escola-Teologica/api/save-workspace-data"], async (req, res) => {
     try {
       const data = req.body;
       if (!data || typeof data !== "object") {

@@ -113,6 +113,26 @@ export default function FinancialView({
     });
   };
 
+  const handleLoadOfferingExample = () => {
+    onAddTransaction({
+      description: 'Oferta Coletada na Aula - Teologia Sistemática I (Pb. Marcelo Reinert)',
+      value: 120.00,
+      type: 'entrada',
+      date: '2026-06-07',
+      category: 'Ofertas nas aulas'
+    });
+  };
+
+  const handleLoadDonationExample = () => {
+    onAddTransaction({
+      description: 'Doação recebida para Fundo de Apoio Estudantil',
+      value: 500.00,
+      type: 'entrada',
+      date: '2026-06-07',
+      category: 'Doações'
+    });
+  };
+
   const handleLoadBoletoExample = () => {
     onAddTransaction({
       description: 'Pagamento de Boleto: Serviço Mensal de Internet Banda Larga',
@@ -452,26 +472,46 @@ export default function FinancialView({
               <div>
                 <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Simulador de Demonstrativos Rápidos</h4>
                 <p className="text-xs text-indigo-700/80 leading-relaxed mt-0.5">
-                  Preparamos atalhos para lançar os exemplos descritos (Venda de Livro Teológico e Pagamento de Boleto de utilidade) em 1 clique para ver como o caixa reage em tempo real.
+                  Preparamos atalhos para lançar os exemplos descritos (Oferta na aula, Doação Especial, Venda de Livro Teológico e Saídas) em 1 clique para ver como o caixa reage em tempo real.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handleLoadBookSaleExample}
+                onClick={handleLoadOfferingExample}
                 className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-2xs"
+                type="button"
               >
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                <span>+ Lançar Livro (R$ 60)</span>
+                <span>+ Lançar Oferta de Aula (R$ 120)</span>
+              </button>
+
+              <button
+                onClick={handleLoadDonationExample}
+                className="bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 text-[10px] font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-2xs"
+                type="button"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>+ Registrar Doação (R$ 500)</span>
+              </button>
+
+              <button
+                onClick={handleLoadBookSaleExample}
+                className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-2xs"
+                type="button"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>+ Venda de Livro (R$ 60)</span>
               </button>
 
               <button
                 onClick={handleLoadBoletoExample}
                 className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 text-[10px] font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-2xs"
+                type="button"
               >
                 <ArrowDownLeft className="w-3.5 h-3.5" />
-                <span>- Lançar Boleto (R$ 149)</span>
+                <span>- Lançar Conta/Saída (R$ 149)</span>
               </button>
             </div>
           </div>

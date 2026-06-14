@@ -159,7 +159,9 @@ export default function SubjectsView({
     setIsGenerating(true);
     setAiError('');
     try {
-      const response = await fetch("/api/gemini/generate-content", {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const fetchUrl = `${baseUrl}/api/gemini/generate-content`.replace(/\/+/g, '/');
+      const response = await fetch(fetchUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
