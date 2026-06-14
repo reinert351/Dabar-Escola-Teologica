@@ -172,8 +172,29 @@ export default function SubjectsView({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Houve uma falha ao gerar o conteúdo.");
+        let errMsg = "Houve uma falha ao gerar o conteúdo.";
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          errMsg = errorData.error || errMsg;
+        } else {
+          const text = await response.text();
+          const titleMatch = text.match(/<title>(.*?)<\/title>/i);
+          if (titleMatch && titleMatch[1]) {
+            errMsg = `Erro de Servidor (${response.status}): ${titleMatch[1]}`;
+          } else {
+            errMsg = `Erro de Rede/Servidor (${response.status}): O servidor não retornou JSON válido.`;
+          }
+          console.error("Detalhes do erro em HTML/Texto:", text);
+        }
+        throw new Error(errMsg);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Resposta recebida que não é JSON:", text);
+        throw new Error(`O servidor não retornou um JSON válido (Status: ${response.status}).`);
       }
 
       const data = await response.json();

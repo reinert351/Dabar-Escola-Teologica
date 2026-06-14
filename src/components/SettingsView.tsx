@@ -76,7 +76,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
         body: JSON.stringify(data),
       });
       
-      const resData = await response.json();
+      let resData: any = {};
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        resData = await response.json();
+      } else {
+        const text = await response.text();
+        const titleMatch = text.match(/<title>(.*?)<\/title>/i);
+        throw new Error(titleMatch && titleMatch[1] ? `Erro do Servidor: ${titleMatch[1]}` : `O servidor não retornou JSON válido (Status: ${response.status})`);
+      }
+      
       if (response.ok && resData.success) {
         setSaveWorkspaceStatus('success');
         setSaveWorkspaceMsg(resData.message || "Gravado com sucesso!");
@@ -92,7 +101,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
     } catch (err: any) {
       console.error("Erro ao sincronizar com o projeto:", err);
       setSaveWorkspaceStatus('error');
-      setSaveWorkspaceMsg("Não foi possível conectar ao servidor de desenvolvimento para gravar as alterações.");
+      setSaveWorkspaceMsg(err.message || "Não foi possível conectar ao servidor de desenvolvimento para gravar as alterações.");
     }
   };
 
