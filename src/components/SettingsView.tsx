@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Database, Download, Upload, AlertTriangle, ShieldCheck, CheckCircle, Activity, Clock, User } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, ShieldCheck, CheckCircle, Activity, Clock, User, AlertCircle } from 'lucide-react';
 import { loadData, saveData } from '../mockData'; 
 import { AuditLog } from '../types';
+import initialState from '../initialState.json';
 
 interface SettingsViewProps {
   onRestoreData: (data: any) => void;
@@ -18,6 +19,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
   const [clientGeminiKey, setClientGeminiKey] = useState(() => localStorage.getItem('LOGOS_C_GEMINI_KEY') || '');
   const [isKeySaved, setIsKeySaved] = useState(false);
 
+  const hasFactoryData = initialState && Object.keys(initialState).length > 0;
+
+  const handleRestoreFromFactory = () => {
+    const confirmMsg = "Aviso: Isso substituirá todos os registros atuais do seu navegador pelos dados embutidos no seu arquivo 'src/initialState.json' implantado.\n\nQualquer alteração local temporária será substituída. Deseja redefinir todo o banco local para carregar os novos dados?";
+    if (window.confirm(confirmMsg)) {
+      const keys = [
+        'LOGOS_STUDENTS',
+        'LOGOS_SUBJECTS',
+        'LOGOS_CLASSES',
+        'LOGOS_GRADES',
+        'LOGOS_ATTENDANCE',
+        'LOGOS_PAYMENTS',
+        'LOGOS_TRANSACTIONS',
+        'LOGOS_ACTIVITIES',
+        'LOGOS_LESSON_PLANS',
+        'LOGOS_LOGGED_IN_DOCENTE',
+        'LOGOS_LOGIN_LOGS'
+      ];
+      keys.forEach(k => {
+        try {
+          localStorage.removeItem(k);
+        } catch (e) {
+          // ignore
+        }
+      });
+      alert("Banco de dados local limpo! A página será reiniciada agora para ler e reimportar o seu arquivo 'initialState.json' de fábrica.");
+      window.location.reload();
+    }
+  };
+
   const handleSaveClientGeminiKey = () => {
     if (clientGeminiKey.trim()) {
       localStorage.setItem('LOGOS_C_GEMINI_KEY', clientGeminiKey.trim());
@@ -29,8 +60,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
       setTimeout(() => setIsKeySaved(false), 3000);
     }
   };
-
-
 
   const generateBackupData = () => {
     // Collect all data from localStorage that we care about
@@ -215,21 +244,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
           </div>
 
           {(window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview')) ? (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-200 rounded-2xl text-xs space-y-2 animate-fade-in">
-              <p className="font-bold flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-amber-405">
-                <AlertTriangle className="w-4 h-4 text-amber-400" /> Versão Estática (GitHub Pages) Ativa
-              </p>
-              <p className="leading-relaxed text-slate-300">
-                Como você está acessando a aplicação hospedada no <strong>GitHub Pages</strong>, o servidor de desenvolvimento não está rodando por trás. Por isso, a gravação automática direta de arquivos no código-fonte dará erro 405 (Not Allowed).
-              </p>
-              <div className="p-3 bg-slate-950/60 rounded-xl space-y-1.5 border border-slate-800/80 text-slate-400 text-[11px] leading-relaxed">
-                <p className="text-slate-205 font-semibold">Como salvar suas alterações definitivamente:</p>
-                <ol className="list-decimal pl-4 space-y-1">
-                  <li>Altere os dados comuns que precisar neste painel.</li>
-                  <li>Clique no botão <strong>"Fazer Download das Informações (Backup)"</strong> na seção abaixo para baixar seu arquivo <code className="text-indigo-300">.json</code> atualizado.</li>
-                  <li>No seu repositório de arquivos do código, substitua o conteúdo do arquivo <code className="text-indigo-300">src/initialState.json</code> com as informações deste backup.</li>
-                  <li>Faça o push/commit para o GitHub. A nova versão do site já terá todos os novos alunos e turmas embutidos de fábrica!</li>
-                </ol>
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-200 rounded-2xl text-xs space-y-2 animate-fade-in">
+                <p className="font-bold flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-amber-405">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" /> Versão Estática (GitHub Pages) Ativa
+                </p>
+                <p className="leading-relaxed text-slate-300">
+                  Como você está acessando a aplicação hospedada no <strong>GitHub Pages</strong>, o servidor de desenvolvimento não está rodando por trás. Por isso, a gravação automática direta de arquivos no código-fonte dará erro 405 (Not Allowed).
+                </p>
+                <div className="p-3 bg-slate-950/60 rounded-xl space-y-1.5 border border-slate-800/80 text-slate-400 text-[11px] leading-relaxed">
+                  <p className="text-slate-205 font-semibold">Como salvar suas alterações definitivamente:</p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Altere os dados comuns que precisar neste painel.</li>
+                    <li>Clique no botão <strong>"Fazer Download das Informações (Backup)"</strong> na seção abaixo para baixar seu arquivo <code className="text-indigo-300">.json</code> atualizado.</li>
+                    <li>No seu repositório de arquivos do código, substitua o conteúdo do arquivo <code className="text-indigo-300">src/initialState.json</code> com as informações deste backup.</li>
+                    <li>Faça o push/commit para o GitHub. A nova versão do site já terá todos os novos alunos e turmas embutidos de fábrica!</li>
+                  </ol>
+                </div>
+              </div>
+
+              {/* Botão para atualizar e carregar o initialState no localStorage se houver dados */}
+              <div className="p-4 bg-indigo-950/45 border border-indigo-500/20 rounded-2xl text-xs space-y-2.5 animate-fade-in">
+                <p className="font-extrabold flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-indigo-400">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400 font-sans" /> Sincronizar Navegador com initialState.json
+                </p>
+                <p className="leading-relaxed text-slate-350">
+                  Se você já substituiu o arquivo <code className="bg-slate-950 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10.5px]">src/initialState.json</code> no seu repositório do GitHub com seu backup de alunos e fez o push, mas a tela do navegador <strong>continua aparecendo vazia/zerada</strong>, é porque o navegador manteve o cache antigo guardado localmente.
+                </p>
+                <p className="leading-relaxed text-slate-350 font-medium">
+                  Clique no botão abaixo para esvaziar o cache de dados do seu navegador e forçar o site a carregar os novos dados embutidos de fábrica que você subiu no GitHub Pages:
+                </p>
+
+                <div className="pt-1 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleRestoreFromFactory}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs rounded-xl transition duration-200 cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/10"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-indigo-200" />
+                    <span>Limpar Cache e Carregar Dados do GitHub</span>
+                  </button>
+                  
+                  <span className="text-[10px] text-slate-400">
+                    {hasFactoryData 
+                      ? "✓ Arquivo de fábrica detectado com dados carregados." 
+                      : "ⓘ O arquivo initialState embutido atualmente está vazio (padrão)."}
+                  </span>
+                </div>
               </div>
             </div>
           ) : null}
