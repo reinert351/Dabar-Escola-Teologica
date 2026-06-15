@@ -79,6 +79,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
   };
 
   const handleSaveToWorkspace = async () => {
+    const isGitHubPages = window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview');
+    if (isGitHubPages) {
+      setSaveWorkspaceStatus('error');
+      setSaveWorkspaceMsg(
+        "A sincronização direta com o código-fonte só pode ser executada no ambiente de desenvolvimento ativo do AI Studio. Como este site está rodando de forma estática no GitHub Pages, o botão não pode salvar os arquivos do servidor diretamente. Para sincronizar permanentemente, baixe o arquivo de backup abaixo, abra seu projeto de código, salve o conteúdo no arquivo 'src/initialState.json' e suba para o GitHub."
+      );
+      return;
+    }
+
     setSaveWorkspaceStatus('saving');
     setSaveWorkspaceMsg('');
     try {
@@ -100,6 +109,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
       } else {
         const text = await response.text();
         const titleMatch = text.match(/<title>(.*?)<\/title>/i);
+        
+        if (response.status === 405 || text.includes("<!DOCTYPE html>")) {
+          throw new Error("O servidor retornou Erro 405 ou resposta não suportada. O ambiente de hospedagem atual é estático e não aceita requisições de gravação. Por favor, execute este comando a partir do ambiente de visualização do Google AI Studio.");
+        }
         throw new Error(titleMatch && titleMatch[1] ? `Erro do Servidor: ${titleMatch[1]}` : `O servidor não retornou JSON válido (Status: ${response.status})`);
       }
       
@@ -184,36 +197,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRestoreData, audit
         <div className="absolute inset-x-0 -top-40 h-80 bg-gradient-to-b from-indigo-500/10 to-transparent blur-3xl pointer-events-none"></div>
         
         {/* Info Content Left */}
-        <div className="flex-1 space-y-4 relative z-10 w-full">
+        <div className="flex-1 space-y-4 relative z-10 w-full font-sans">
           <div className="w-12 h-12 bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center">
             <Database className="w-6 h-6 animate-pulse" />
           </div>
           <div>
             <span className="bg-amber-400/20 text-amber-300 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded inline-block mb-2 border border-amber-400/10">
-              Urgente: Configuração para o GitHub
+              Sincronização do Banco de Dados
             </span>
-            <h3 className="text-lg font-bold text-slate-100 tracking-tight">Salvar Alunos e Turmas para o GitHub</h3>
+            <h3 className="text-lg font-bold text-slate-100 tracking-tight">Salvar Alunos e Turmas para o Código-Fonte</h3>
             <p className="text-xs text-slate-350 leading-relaxed mt-2.5">
               Por padrão, os alunos e as notas que você cadastra ou modifica aqui no painel ficam salvos <strong>somente no navegador local</strong> (<code className="bg-slate-800/80 text-amber-200 px-1 py-0.5 rounded font-mono text-[10px]">localStorage</code>).
             </p>
             <p className="text-xs text-slate-350 leading-relaxed mt-2">
-              Se você exportar o app para o <strong>GitHub</strong> ou acessá-lo de outro dispositivo, esses novos cadastros não estarão lá, pois o cache estará limpo. Para resolver isso e <strong>gravar de forma oficial e permanente</strong> esses dados no código-fonte, clique no botão abaixo.
+              Se você exportar o app para o <strong>GitHub</strong> ou acessá-lo de outro dispositivo, esses novos cadastros não estarão lá por padrão. Para gravar os dados atuais de forma definitiva no banco inicial da aplicação (<code className="bg-slate-800/80 text-indigo-200 px-1 py-0.5 rounded font-mono text-[10px]">src/initialState.json</code>), clique no botão abaixo.
             </p>
           </div>
+
+          {(window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview')) ? (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-200 rounded-2xl text-xs space-y-2 animate-fade-in">
+              <p className="font-bold flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-amber-405">
+                <AlertTriangle className="w-4 h-4 text-amber-400" /> Versão Estática (GitHub Pages) Ativa
+              </p>
+              <p className="leading-relaxed text-slate-300">
+                Como você está acessando a aplicação hospedada no <strong>GitHub Pages</strong>, o servidor de desenvolvimento não está rodando por trás. Por isso, a gravação automática direta de arquivos no código-fonte dará erro 405 (Not Allowed).
+              </p>
+              <div className="p-3 bg-slate-950/60 rounded-xl space-y-1.5 border border-slate-800/80 text-slate-400 text-[11px] leading-relaxed">
+                <p className="text-slate-205 font-semibold">Como salvar suas alterações definitivamente:</p>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Altere os dados comuns que precisar neste painel.</li>
+                  <li>Clique no botão <strong>"Fazer Download das Informações (Backup)"</strong> na seção abaixo para baixar seu arquivo <code className="text-indigo-300">.json</code> atualizado.</li>
+                  <li>No seu repositório de arquivos do código, substitua o conteúdo do arquivo <code className="text-indigo-300">src/initialState.json</code> com as informações deste backup.</li>
+                  <li>Faça o push/commit para o GitHub. A nova versão do site já terá todos os novos alunos e turmas embutidos de fábrica!</li>
+                </ol>
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button 
               type="button"
-              disabled={saveWorkspaceStatus === 'saving'}
+              disabled={saveWorkspaceStatus === 'saving' || window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview')}
               onClick={handleSaveToWorkspace}
               className={`px-5 py-3 font-bold text-xs rounded-xl transition duration-300 ${
-                saveWorkspaceStatus === 'saving'
-                  ? 'bg-indigo-700/50 text-indigo-300 cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white cursor-pointer shadow-lg shadow-indigo-605/30'
+                (window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview'))
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
+                  : saveWorkspaceStatus === 'saving'
+                    ? 'bg-indigo-700/50 text-indigo-300 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white cursor-pointer shadow-lg shadow-indigo-605/30'
               } flex items-center gap-2`}
             >
               <Database className="w-4 h-4 text-indigo-200" />
-              {saveWorkspaceStatus === 'saving' ? 'Gravando dados no código-fonte...' : 'Gravar Alterações Definitivamente no Código'}
+              {(window.location.hostname.includes('github.io') || window.location.hostname.includes('github.preview')) 
+                ? 'Gravação indisponível no GitHub Pages' 
+                : saveWorkspaceStatus === 'saving' 
+                  ? 'Gravando dados no código-fonte...' 
+                  : 'Gravar Alterações Definitivamente no Código'}
             </button>
           </div>
           
