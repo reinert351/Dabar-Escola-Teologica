@@ -1,0 +1,206 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "A student registered in the theological school.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "gender": { "type": "string", "enum": ["M", "F"] },
+        "registrationNumber": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "className": { "type": "string" },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
+        "enrollmentDate": { "type": "string" },
+        "photoUrl": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "registrationNumber", "className", "status"]
+    },
+    "LessonPlanRecord": {
+      "title": "LessonPlanRecord",
+      "description": "Weekly lesson plans and theological contents.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "classNumber": { "type": "number" },
+        "content": { "type": "string" }
+      },
+      "required": ["id", "subjectId", "classNumber", "content"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "A course subject / academic discipline.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "workload": { "type": "number" }
+      },
+      "required": ["id", "name", "teacherName", "workload"]
+    },
+    "ClassGroup": {
+      "title": "ClassGroup",
+      "description": "A group of subjects with specific schedules.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "subjectIds": { "type": "array" },
+        "schedule": { "type": "string" }
+      },
+      "required": ["id", "name", "subjectIds", "schedule"]
+    },
+    "GradeRecord": {
+      "title": "GradeRecord",
+      "description": "Academic grades for a student in a specific subject.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "term1Grade": { "type": "number" },
+        "term2Grade": { "type": "number" },
+        "term3Grade": { "type": "number" },
+        "term4Grade": { "type": "number" },
+        "examGrade": { "type": "number" },
+        "averageGrade": { "type": "number" },
+        "status": { "type": "string", "enum": ["Aprovado", "Recuperação", "Reprovado"] }
+      },
+      "required": ["id", "studentId", "subjectId", "status"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "A single day student class attendance/frequencia.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Presença", "Falta", "Falta Justificada"] },
+        "justification": { "type": "string" },
+        "period": { "type": "string" }
+      },
+      "required": ["id", "studentId", "subjectId", "date", "status"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "A book selling or enrollment payment installment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "value": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pago", "Pendente", "Atrasado"] },
+        "paymentDate": { "type": "string" },
+        "month": { "type": "string" }
+      },
+      "required": ["id", "studentId", "value", "dueDate", "status", "month"]
+    },
+    "CashTransaction": {
+      "title": "CashTransaction",
+      "description": "An entry in the financial flow ledger / livro caixa.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "value": { "type": "number" },
+        "type": { "type": "string", "enum": ["entrada", "saida"] },
+        "date": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "description", "value", "type", "date", "category"]
+    },
+    "AcademicActivity": {
+      "title": "AcademicActivity",
+      "description": "School events, exams, assignments, or notices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["Prova", "Trabalho", "Evento", "Aviso"] },
+        "targetClass": { "type": "string" }
+      },
+      "required": ["id", "title", "description", "date", "type"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "An action log for docente system activities.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "docenteEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "docenteEmail", "action", "details"]
+    },
+    "LoginRecord": {
+      "title": "LoginRecord",
+      "description": "A record of logins corresponding to student or docente portals.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userType": { "type": "string", "enum": ["Docente", "Aluno"] },
+        "identifier": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userType", "identifier", "name"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of educational student directory entries."
+    },
+    "/lesson_plans/{planId}": {
+      "schema": "LessonPlanRecord",
+      "description": "Theological syllabus lessons and dynamic guides."
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Active theological course fields and topics."
+    },
+    "/classes/{classId}": {
+      "schema": "ClassGroup",
+      "description": "Class cohorts scheduling subjects and timings."
+    },
+    "/grades/{gradeId}": {
+      "schema": "GradeRecord",
+      "description": "Student grade files for each discipline."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "AttendanceRecord",
+      "description": "School attendance register logs."
+    },
+    "/payments/{paymentId}": {
+      "schema": "PaymentRecord",
+      "description": "Invoiced book collections or tution receipts."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "CashTransaction",
+      "description": "Financial stream records in ledger."
+    },
+    "/activities/{activityId}": {
+      "schema": "AcademicActivity",
+      "description": "Task boards or calendar events."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Administrative records tracking critical edits."
+    },
+    "/login_logs/{logId}": {
+      "schema": "LoginRecord",
+      "description": "Security tracking lists of portal attempts."
+    }
+  }
+}

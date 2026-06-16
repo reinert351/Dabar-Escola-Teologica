@@ -308,6 +308,36 @@ export const INITIAL_PAYMENTS: PaymentRecord[] = [
 export const INITIAL_LOGIN_LOGS: any[] = [];
 
 // Localstorage state helpers
+const checkAndSyncInitialState = () => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const currentSignature = JSON.stringify(initialState);
+    const lastSignature = localStorage.getItem('LOGOS_INITIAL_STATE_SIGNATURE');
+    
+    // If the signature is different (some changes were committed and deployed to GitHub Pages), 
+    // AND the initialState.json is not an empty object
+    if (currentSignature !== lastSignature && initialState && Object.keys(initialState).length > 0) {
+      console.log("Dabar: Detectado novo initialState.json! Sincronizando banco de dados local...");
+      
+      // Update each key in localStorage with the value from initialState.json
+      Object.entries(initialState).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          localStorage.setItem(key, JSON.stringify(val));
+        }
+      });
+      
+      // Save the new signature so we don't repeat this until another change is deployed
+      localStorage.setItem('LOGOS_INITIAL_STATE_SIGNATURE', currentSignature);
+    }
+  } catch (e) {
+    console.error("Erro ao sincronizar initialState:", e);
+  }
+};
+
+// Run the check immediately on module load
+checkAndSyncInitialState();
+
 export const loadData = <T>(key: string, initial: T): T => {
   const item = localStorage.getItem(key);
   if (!item) {

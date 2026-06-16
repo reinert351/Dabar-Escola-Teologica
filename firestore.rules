@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives & Security Guards
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isBoolean(val) {
+      return val is bool;
+    }
+
+    function isNumber(val) {
+      return val is int || val is float;
+    }
+
+    // Collection: Students
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if isValidId(studentId)
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.registrationNumber is string && request.resource.data.registrationNumber.size() <= 60;
+    }
+
+    // Collection: Lesson Plans
+    match /lesson_plans/{planId} {
+      allow read: if true;
+      allow write: if isValidId(planId)
+        && request.resource.data.subjectId is string && request.resource.data.subjectId.size() <= 128
+        && isNumber(request.resource.data.classNumber)
+        && request.resource.data.content is string && request.resource.data.content.size() <= 100000;
+    }
+
+    // Collection: Subjects
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isValidId(subjectId)
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.teacherName is string && request.resource.data.teacherName.size() <= 200
+        && isNumber(request.resource.data.workload);
+    }
+
+    // Collection: Classes
+    match /classes/{classId} {
+      allow read: if true;
+      allow write: if isValidId(classId)
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.subjectIds is list
+        && request.resource.data.schedule is string && request.resource.data.schedule.size() <= 400;
+    }
+
+    // Collection: Grades
+    match /grades/{gradeId} {
+      allow read: if true;
+      allow write: if isValidId(gradeId)
+        && request.resource.data.studentId is string && request.resource.data.studentId.size() <= 128
+        && request.resource.data.subjectId is string && request.resource.data.subjectId.size() <= 128
+        && request.resource.data.status is string && request.resource.data.status.size() <= 60;
+    }
+
+    // Collection: Attendance
+    match /attendance/{attendanceId} {
+      allow read: if true;
+      allow write: if isValidId(attendanceId)
+        && request.resource.data.studentId is string && request.resource.data.studentId.size() <= 128
+        && request.resource.data.subjectId is string && request.resource.data.subjectId.size() <= 128
+        && request.resource.data.date is string && request.resource.data.date.size() <= 30
+        && request.resource.data.status is string && request.resource.data.status.size() <= 60;
+    }
+
+    // Collection: Payments
+    match /payments/{paymentId} {
+      allow read: if true;
+      allow write: if isValidId(paymentId)
+        && request.resource.data.studentId is string && request.resource.data.studentId.size() <= 128
+        && isNumber(request.resource.data.value)
+        && request.resource.data.dueDate is string && request.resource.data.dueDate.size() <= 30
+        && request.resource.data.month is string && request.resource.data.month.size() <= 100
+        && request.resource.data.status is string && request.resource.data.status.size() <= 60;
+    }
+
+    // Collection: Transactions
+    match /transactions/{transactionId} {
+      allow read: if true;
+      allow write: if isValidId(transactionId)
+        && request.resource.data.description is string && request.resource.data.description.size() <= 400
+        && isNumber(request.resource.data.value)
+        && request.resource.data.type is string && (request.resource.data.type == 'entrada' || request.resource.data.type == 'saida')
+        && request.resource.data.date is string && request.resource.data.date.size() <= 30
+        && request.resource.data.category is string && request.resource.data.category.size() <= 100;
+    }
+
+    // Collection: Activities
+    match /activities/{activityId} {
+      allow read: if true;
+      allow write: if isValidId(activityId)
+        && request.resource.data.title is string && request.resource.data.title.size() <= 200
+        && request.resource.data.description is string && request.resource.data.description.size() <= 5000
+        && request.resource.data.type is string && request.resource.data.type.size() <= 60
+        && request.resource.data.date is string && request.resource.data.date.size() <= 30;
+    }
+
+    // Collection: Audit logs
+    match /audit_logs/{logId} {
+      allow read: if true;
+      allow write: if isValidId(logId)
+        && request.resource.data.docenteEmail is string && request.resource.data.docenteEmail.size() <= 200
+        && request.resource.data.action is string && request.resource.data.action.size() <= 200
+        && request.resource.data.timestamp is string && request.resource.data.timestamp.size() <= 60;
+    }
+
+    // Collection: Login logs
+    match /login_logs/{logId} {
+      allow read: if true;
+      allow write: if isValidId(logId)
+        && request.resource.data.userType is string && request.resource.data.userType.size() <= 60
+        && request.resource.data.identifier is string && request.resource.data.identifier.size() <= 200
+        && request.resource.data.timestamp is string && request.resource.data.timestamp.size() <= 60;
+    }
+  }
+}

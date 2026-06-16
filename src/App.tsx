@@ -43,6 +43,13 @@ import {
   saveData 
 } from './mockData';
 
+import { 
+  saveDocument, 
+  deleteDocument, 
+  fetchCollection, 
+  batchSaveCollection 
+} from './firebase';
+
 // Imports view modules
 import DashboardView from './components/DashboardView';
 import StudentListView from './components/StudentListView';
@@ -58,6 +65,9 @@ import AccessLogsView from './components/AccessLogsView';
 import logoImage from './assets/images/dabar_theology_logo_1781277925734.jpg';
 
 export default function App() {
+  // --- CLOUD FIREBASE SYNC STATUS ---
+  const [isSyncing, setIsSyncing] = useState(true);
+
   // --- STATE PERSISTENCE ---
   const [students, setStudents] = useState<Student[]>(() => 
     loadData<Student[]>('LOGOS_STUDENTS', INITIAL_STUDENTS)
@@ -112,6 +122,64 @@ export default function App() {
     loadData<LoginRecord[]>('LOGOS_LOGIN_LOGS', INITIAL_LOGIN_LOGS)
   );
 
+  // Initial Sync from Firestore on Mount
+  useEffect(() => {
+    async function syncWithFirestore() {
+      try {
+        console.log("Dabar: Sincronizando dados com o Google Cloud Firestore...");
+        
+        // Fetch all tables from Firestore
+        const cloudStudents = await fetchCollection('students');
+        const cloudLessonPlans = await fetchCollection('lesson_plans');
+        const cloudSubjects = await fetchCollection('subjects');
+        const cloudClasses = await fetchCollection('classes');
+        const cloudGrades = await fetchCollection('grades');
+        const cloudAttendance = await fetchCollection('attendance');
+        const cloudPayments = await fetchCollection('payments');
+        const cloudTransactions = await fetchCollection('transactions');
+        const cloudActivities = await fetchCollection('activities');
+        const cloudAudits = await fetchCollection('audit_logs');
+        const cloudLoginLogs = await fetchCollection('login_logs');
+
+        // If the database has no students, seed it with current local/default state
+        if (cloudStudents.length === 0) {
+          console.log("Dabar: Firestore vazio. Realizando semeadura e upload inicial...");
+          await batchSaveCollection('students', students);
+          await batchSaveCollection('lesson_plans', lessonPlans);
+          await batchSaveCollection('subjects', subjects);
+          await batchSaveCollection('classes', classes);
+          await batchSaveCollection('grades', grades);
+          await batchSaveCollection('attendance', attendance);
+          await batchSaveCollection('payments', payments);
+          await batchSaveCollection('transactions', transactions);
+          await batchSaveCollection('activities', activities);
+          await batchSaveCollection('audit_logs', auditLogs);
+          await batchSaveCollection('login_logs', loginLogs);
+          console.log("Dabar: Semeadura concluída!");
+        } else {
+          // Update local state with latest from Cloud Firestore
+          setStudents(cloudStudents);
+          setLessonPlans(cloudLessonPlans);
+          setSubjects(cloudSubjects);
+          setClasses(cloudClasses);
+          setGrades(cloudGrades);
+          setAttendance(cloudAttendance);
+          setPayments(cloudPayments);
+          setTransactions(cloudTransactions);
+          setActivities(cloudActivities);
+          setAuditLogs(cloudAudits);
+          setLoginLogs(cloudLoginLogs);
+          console.log("Dabar: Sincronização concluída com sucesso com o Firestore!");
+        }
+      } catch (err) {
+        console.error("Dabar: Erro de sincronização Cloud:", err);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+    syncWithFirestore();
+  }, []);
+
   const recordLogin = (userType: 'Docente' | 'Aluno', identifier: string, name: string) => {
     const newRecord: LoginRecord = {
       id: `login-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -121,10 +189,14 @@ export default function App() {
       name
     };
     setLoginLogs(prev => [newRecord, ...prev]);
+    saveDocument('login_logs', newRecord.id, newRecord);
   };
 
   const handleClearLoginLogs = () => {
     setLoginLogs([]);
+    loginLogs.forEach(log => {
+      deleteDocument('login_logs', log.id);
+    });
   };
 
   const writeAuditLog = (action: string, details: string) => {
@@ -137,6 +209,7 @@ export default function App() {
       details
     };
     setAuditLogs(prev => [newLog, ...prev].slice(0, 100)); // Keep last 100 logs
+    saveDocument('audit_logs', newLog.id, newLog);
   };
 
   // Switch between Admin context and Student portal context
@@ -336,28 +409,37 @@ export default function App() {
     };
 
     setStudents(prev => [newStudent, ...prev]);
+    saveDocument('students', id, newStudent);
 
     // Preseed blank average-grade sheets for subjects
-    const newGrades: GradeRecord[] = subjects.map(sub => ({
-      id: `grd-gen-${Date.now()}-${sub.id}-${id}`,
-      studentId: id,
-      subjectId: sub.id,
-      term1Grade: null,
-      term2Grade: null,
-      term3Grade: null,
-      term4Grade: null,
-      examGrade: null,
-      averageGrade: null,
-      status: 'Reprovado'
-    }));
+    const newGrades: GradeRecord[] = subjects.map(sub => {
+      const gId = `grd-gen-${Date.now()}-${sub.id}-${id}`;
+      return {
+        id: gId,
+        studentId: id,
+        subjectId: sub.id,
+        term1Grade: null,
+        term2Grade: null,
+        term3Grade: null,
+        term4Grade: null,
+        examGrade: null,
+        averageGrade: null,
+        status: 'Reprovado'
+      };
+    });
     
     setGrades(prev => [...newGrades, ...prev]);
+    newGrades.forEach(g => {
+      saveDocument('grades', g.id, g);
+    });
+
     writeAuditLog('Inclusão de Aluno', `Adicionado novo discente: ${newStudentData.name}`);
   };
 
   // 2. EDIT STUDENT PROFILE DETAILS
   const handleEditStudent = (updatedStudent: Student) => {
     setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    saveDocument('students', updatedStudent.id, updatedStudent);
     writeAuditLog('Atualização de Cadastro', `Ficha do aluno modificada: ${updatedStudent.name}`);
   };
 
@@ -365,9 +447,26 @@ export default function App() {
   const handleDeleteStudent = (studentId: string) => {
     const sName = students.find(s=>s.id === studentId)?.name || studentId;
     setStudents(prev => prev.filter(s => s.id !== studentId));
+    deleteDocument('students', studentId);
+
+    // Cascade grades delete
+    grades.forEach(g => {
+      if (g.studentId === studentId) deleteDocument('grades', g.id);
+    });
     setGrades(prev => prev.filter(g => g.studentId !== studentId));
+
+    // Cascade attendance delete
+    attendance.forEach(a => {
+      if (a.studentId === studentId) deleteDocument('attendance', a.id);
+    });
     setAttendance(prev => prev.filter(a => a.studentId !== studentId));
+
+    // Cascade payments delete
+    payments.forEach(p => {
+      if (p.studentId === studentId) deleteDocument('payments', p.id);
+    });
     setPayments(prev => prev.filter(p => p.studentId !== studentId));
+
     writeAuditLog('Exclusão de Aluno', `Discente permanentemente removido: ${sName}`);
   };
 
@@ -384,6 +483,8 @@ export default function App() {
         } else {
           copy.push(record);
         }
+        // Save to Firebase
+        saveDocument('attendance', record.id || `${record.studentId}-${record.subjectId}-${record.date}`, record);
       });
       return copy;
     });
@@ -401,7 +502,7 @@ export default function App() {
       }
       return [record, ...prev];
     });
-    // no audit log since students trigger this in theory, but maybe? 
+    saveDocument('attendance', record.id || `${record.studentId}-${record.subjectId}-${record.date}`, record);
   };
 
   // 6. SAVE GRADE SHEET RECORDS
@@ -417,6 +518,8 @@ export default function App() {
         } else {
           copy.push(record);
         }
+        // Save to Firebase
+        saveDocument('grades', record.id, record);
       });
       return copy;
     });
@@ -427,11 +530,13 @@ export default function App() {
   const handleTogglePaymentStatus = (paymentId: string) => {
     setPayments(prev => prev.map(p => {
       if (p.id === paymentId) {
-        return {
+        const updated = {
           ...p,
-          status: 'Pago',
+          status: 'Pago' as const,
           paymentDate: '2026-06-07' // transaction today
         };
+        saveDocument('payments', paymentId, updated);
+        return updated;
       }
       return p;
     }));
@@ -440,11 +545,13 @@ export default function App() {
 
   const handleUpdatePayment = (updatedPayment: PaymentRecord) => {
     setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+    saveDocument('payments', updatedPayment.id, updatedPayment);
     writeAuditLog('Atualização Financeira', `Dados do pagamento/mensalidade alterados: ${updatedPayment.id}`);
   };
 
   const handleDeletePayment = (paymentId: string) => {
     setPayments(prev => prev.filter(p => p.id !== paymentId));
+    deleteDocument('payments', paymentId);
     writeAuditLog('Exclusão de Faturamento', `Cobrança apagada do sistema: ${paymentId}`);
   };
 
@@ -454,6 +561,9 @@ export default function App() {
       id: `pay-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
     }));
     setPayments(prev => [...withIds, ...prev]);
+    withIds.forEach(p => {
+      saveDocument('payments', p.id, p);
+    });
     const studentNamesDesc = newPayments.length <= 3 
       ? newPayments.map(p => {
           const s = students.find(std => std.id === p.studentId);
@@ -468,21 +578,27 @@ export default function App() {
     const id = `sub-${Date.now()}`;
     const subject: Subject = { ...newSub, id };
     setSubjects(prev => [...prev, subject]);
+    saveDocument('subjects', id, subject);
 
     // Preseed blank average-grade sheets for all students for this subject
     setGrades(prev => {
-      const newGrades: GradeRecord[] = students.map(s => ({
-        id: `grd-gen-${Date.now()}-${id}-${s.id}`,
-        studentId: s.id,
-        subjectId: id,
-        term1Grade: null,
-        term2Grade: null,
-        term3Grade: null,
-        term4Grade: null,
-        examGrade: null,
-        averageGrade: null,
-        status: 'Reprovado'
-      }));
+      const newGrades: GradeRecord[] = students.map(s => {
+        const gId = `grd-gen-${Date.now()}-${id}-${s.id}`;
+        const gObj: GradeRecord = {
+          id: gId,
+          studentId: s.id,
+          subjectId: id,
+          term1Grade: null,
+          term2Grade: null,
+          term3Grade: null,
+          term4Grade: null,
+          examGrade: null,
+          averageGrade: null,
+          status: 'Reprovado'
+        };
+        saveDocument('grades', gId, gObj);
+        return gObj;
+      });
       return [...newGrades, ...prev];
     });
     writeAuditLog('Nova Disciplina', `Disciplina incluída na grade acadêmica: ${subject.name}`);
@@ -490,14 +606,27 @@ export default function App() {
 
   const handleEditSubject = (updated: Subject) => {
     setSubjects(prev => prev.map(s => s.id === updated.id ? updated : s));
+    saveDocument('subjects', updated.id, updated);
     writeAuditLog('Edição de Disciplina', `Dados da disciplina alterados: ${updated.name}`);
   };
 
   const handleDeleteSubject = (id: string) => {
     const sName = subjects.find(s=>s.id === id)?.name || id;
     setSubjects(prev => prev.filter(s => s.id !== id));
+    deleteDocument('subjects', id);
+
+    // Cascade grades delete
+    grades.forEach(g => {
+      if (g.subjectId === id) deleteDocument('grades', g.id);
+    });
     setGrades(prev => prev.filter(g => g.subjectId !== id));
+
+    // Cascade attendance delete
+    attendance.forEach(a => {
+      if (a.subjectId === id) deleteDocument('attendance', a.id);
+    });
     setAttendance(prev => prev.filter(a => a.subjectId !== id));
+
     writeAuditLog('Exclusão de Disciplina', `Disciplina excluída permanentemente: ${sName}`);
   };
 
@@ -508,24 +637,53 @@ export default function App() {
       id: `tx-${Date.now()}`
     };
     setTransactions(prev => [transaction, ...prev]);
+    saveDocument('transactions', transaction.id, transaction);
     writeAuditLog('Lançamento Livro-Caixa', `Novo registro: [${newTx.type}] ${newTx.description}`);
   };
 
   const handleEditTransaction = (updated: CashTransaction) => {
     setTransactions(prev => prev.map(t => t.id === updated.id ? updated : t));
+    saveDocument('transactions', updated.id, updated);
     writeAuditLog('Edição Livro-Caixa', `Alteração do registro contábil: ${updated.description}`);
   };
   
-  const handleRestoreData = (parsedData: any) => {
-    if (parsedData.LOGOS_STUDENTS) setStudents(parsedData.LOGOS_STUDENTS);
-    if (parsedData.LOGOS_SUBJECTS) setSubjects(parsedData.LOGOS_SUBJECTS);
-    if (parsedData.LOGOS_CLASSES) setClasses(parsedData.LOGOS_CLASSES);
-    if (parsedData.LOGOS_GRADES) setGrades(parsedData.LOGOS_GRADES);
-    if (parsedData.LOGOS_ATTENDANCE) setAttendance(parsedData.LOGOS_ATTENDANCE);
-    if (parsedData.LOGOS_PAYMENTS) setPayments(parsedData.LOGOS_PAYMENTS);
-    if (parsedData.LOGOS_TRANSACTIONS) setTransactions(parsedData.LOGOS_TRANSACTIONS);
-    if (parsedData.LOGOS_ACTIVITIES) setActivities(parsedData.LOGOS_ACTIVITIES);
-    if (parsedData.LOGOS_LESSON_PLANS) setLessonPlans(parsedData.LOGOS_LESSON_PLANS);
+  const handleRestoreData = async (parsedData: any) => {
+    if (parsedData.LOGOS_STUDENTS) {
+      setStudents(parsedData.LOGOS_STUDENTS);
+      await batchSaveCollection('students', parsedData.LOGOS_STUDENTS);
+    }
+    if (parsedData.LOGOS_SUBJECTS) {
+      setSubjects(parsedData.LOGOS_SUBJECTS);
+      await batchSaveCollection('subjects', parsedData.LOGOS_SUBJECTS);
+    }
+    if (parsedData.LOGOS_CLASSES) {
+      setClasses(parsedData.LOGOS_CLASSES);
+      await batchSaveCollection('classes', parsedData.LOGOS_CLASSES);
+    }
+    if (parsedData.LOGOS_GRADES) {
+      setGrades(parsedData.LOGOS_GRADES);
+      await batchSaveCollection('grades', parsedData.LOGOS_GRADES);
+    }
+    if (parsedData.LOGOS_ATTENDANCE) {
+      setAttendance(parsedData.LOGOS_ATTENDANCE);
+      await batchSaveCollection('attendance', parsedData.LOGOS_ATTENDANCE);
+    }
+    if (parsedData.LOGOS_PAYMENTS) {
+      setPayments(parsedData.LOGOS_PAYMENTS);
+      await batchSaveCollection('payments', parsedData.LOGOS_PAYMENTS);
+    }
+    if (parsedData.LOGOS_TRANSACTIONS) {
+      setTransactions(parsedData.LOGOS_TRANSACTIONS);
+      await batchSaveCollection('transactions', parsedData.LOGOS_TRANSACTIONS);
+    }
+    if (parsedData.LOGOS_ACTIVITIES) {
+      setActivities(parsedData.LOGOS_ACTIVITIES);
+      await batchSaveCollection('activities', parsedData.LOGOS_ACTIVITIES);
+    }
+    if (parsedData.LOGOS_LESSON_PLANS) {
+      setLessonPlans(parsedData.LOGOS_LESSON_PLANS);
+      await batchSaveCollection('lesson_plans', parsedData.LOGOS_LESSON_PLANS);
+    }
     if (parsedData.LOGOS_LOGGED_IN_DOCENTE) setLoggedInDocenteEmail(parsedData.LOGOS_LOGGED_IN_DOCENTE);
     writeAuditLog('Backup Restaurado', 'O sistema restaurou os dados a partir de um arquivo JSON local.');
   };
@@ -533,8 +691,40 @@ export default function App() {
   const handleDeleteTransaction = (id: string) => {
     const txInfo = transactions.find(t=>t.id===id)?.description || id;
     setTransactions(prev => prev.filter(t => t.id !== id));
+    deleteDocument('transactions', id);
     writeAuditLog('Exclusão Livro-Caixa', `Registro contábil excluído: ${txInfo}`);
   };
+
+  if (isSyncing) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans antialiased text-slate-100 p-6" id="logos-cloud-sync-loader">
+        <div className="w-full max-w-sm bg-slate-900/60 border border-indigo-500/10 rounded-3xl p-8 shadow-2xl backdrop-blur-xl text-center space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-amber-400 to-indigo-500 animate-pulse"></div>
+          
+          <div className="relative w-20 h-20 mx-auto">
+            <div className="absolute inset-0 rounded-full bg-indigo-500/10 border border-indigo-500/20 animate-ping"></div>
+            <div className="w-20 h-20 rounded-full border-t-2 border-r-2 border-indigo-500 border-b-2 border-l-2 border-l-transparent border-b-transparent animate-spin flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-slate-900 border border-indigo-500/10 flex items-center justify-center">
+                <Database className="w-6 h-6 text-indigo-400 animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-md sm:text-lg font-bold tracking-tight text-white/95">Conectando ao Firestore Cloud ☁️</h2>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-[280px] mx-auto font-medium">
+              Sincronizando dados com o Google Cloud. Todas as alterações são salvas permanentemente em tempo real.
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-emerald-400 font-extrabold tracking-widest uppercase">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <span>Banco de Dados Online</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-indigo-50/30 flex flex-col font-sans antialiased text-slate-800" id="logos-academy-app">
@@ -812,20 +1002,28 @@ export default function App() {
                   subjects={subjects} 
                   onAddClassGroup={(newCls) => {
                     const id = `cls-${Date.now()}`;
-                    setClasses(prev => [...prev, { ...newCls, id }]);
+                    const clsObj = { ...newCls, id };
+                    setClasses(prev => [...prev, clsObj]);
+                    saveDocument('classes', id, clsObj);
                     writeAuditLog('Nova Turma', `Criada turma acadêmica: ${newCls.name}`);
                   }}
                   onEditClassGroup={(updatedCls) => {
                     const prevClass = classes.find(c => c.id === updatedCls.id);
                     if (prevClass && prevClass.name !== updatedCls.name) {
-                      setStudents(prev => prev.map(s => s.className === prevClass.name ? { ...s, className: updatedCls.name } : s));
+                      const updatedStudents = students.map(s => s.className === prevClass.name ? { ...s, className: updatedCls.name } : s);
+                      setStudents(updatedStudents);
+                      updatedStudents.filter(s => s.className === updatedCls.name).forEach(s => {
+                        saveDocument('students', s.id, s);
+                      });
                     }
                     setClasses(prev => prev.map(c => c.id === updatedCls.id ? updatedCls : c));
+                    saveDocument('classes', updatedCls.id, updatedCls);
                     writeAuditLog('Edição de Turma', `Dados e vínculos da turma alterados: ${updatedCls.name}`);
                   }}
                   onDeleteClassGroup={(id) => {
                     const cName = classes.find(c=>c.id === id)?.name || id;
                     setClasses(prev => prev.filter(c => c.id !== id));
+                    deleteDocument('classes', id);
                     writeAuditLog('Exclusão de Turma', `Turma removida do sistema: ${cName}`);
                   }}
                 />
@@ -850,6 +1048,9 @@ export default function App() {
                       }
                       return [...prev, plan];
                     });
+                    const planId = plan.id || `plan-${plan.subjectId}-${plan.classNumber}`;
+                    const planWithId = { ...plan, id: planId };
+                    saveDocument('lesson_plans', planId, planWithId);
                     const subjectName = subjects.find(s=>s.id === plan.subjectId)?.name || plan.subjectId;
                     writeAuditLog('Plano de Aula Atualizado', `Plano modificado (AI ou manual) na disciplina: ${subjectName} (Aula ${plan.classNumber})`);
                   }}
@@ -896,13 +1097,17 @@ export default function App() {
                   students={students}
                   onAddActivity={(newAct) => {
                     const id = `act-${Date.now()}`;
-                    setActivities(prev => [...prev, { ...newAct, id }]);
+                    const actObj = { ...newAct, id };
+                    setActivities(prev => [...prev, actObj]);
+                    saveDocument('activities', id, actObj);
                   }}
                   onEditActivity={(updatedAct) => {
                     setActivities(prev => prev.map(a => a.id === updatedAct.id ? updatedAct : a));
+                    saveDocument('activities', updatedAct.id, updatedAct);
                   }}
                   onDeleteActivity={(id) => {
                     setActivities(prev => prev.filter(a => a.id !== id));
+                    deleteDocument('activities', id);
                   }}
                 />
               )}
